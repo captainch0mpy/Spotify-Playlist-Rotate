@@ -2,6 +2,10 @@
 
 A two-way rotation tool for Spotify playlists. Tracks that have been in your primary playlist for too long move to a holding playlist; tracks that have rested in holding long enough come back. The age of each track resets every time it moves, so the cycle continues naturally with no bookkeeping.
 
+**🎵 Live demo: <https://captainch0mpy.github.io/Spotify-Playlist-Rotate/>**
+
+You'll still need to create your own Spotify developer app (see [Prerequisites](#prerequisites-spotify-app-setup) below) — the demo is the same code, just hosted so you don't have to run it locally.
+
 Comes in two flavors that share the same logic:
 
 | Tool | Best for | Runs where |
@@ -35,11 +39,12 @@ This part is the same regardless of which flavor you use. You need a Spotify Dev
 2. **Create the app** at <https://developer.spotify.com/dashboard>. Click **Create app**, name it anything ("Playlist Rotator" is fine).
 
 3. **Redirect URI.** What you enter depends on which flavor:
-   - **Web app served from `http://127.0.0.1:8080/`**: enter exactly that, including the trailing slash.
+   - **Using the hosted demo** at <https://captainch0mpy.github.io/Spotify-Playlist-Rotate/>: enter that URL, trailing slash included.
+   - **Self-hosting the web app on your own HTTPS URL**: enter that URL.
+   - **Running the web app locally** at `http://127.0.0.1:8080/`: enter exactly that, including the trailing slash.
    - **Python script**: enter `http://127.0.0.1:8888/callback`.
-   - **Web app hosted on a real HTTPS URL** (e.g. GitHub Pages): enter that URL.
 
-   Spotify rejects `localhost` and rejects any HTTP redirect URI that isn't a loopback IP literal — the only HTTP URLs that work are `http://127.0.0.1:PORT` and `http://[::1]:PORT`. Everything else must be HTTPS.
+   Spotify rejects `localhost` and rejects any HTTP redirect URI that isn't a loopback IP literal — the only HTTP URLs that work are `http://127.0.0.1:PORT` and `http://[::1]:PORT`. Everything else must be HTTPS. You can register multiple URIs per app, so if you want both the hosted demo and a local setup, add both.
 
 4. **APIs used.** Select **Web API**. Save.
 
@@ -88,6 +93,8 @@ Visit <http://127.0.0.1:8080/playlist-rotator.html>.
 ### Deploy to a public host
 
 The file is fully self-contained — drop it on any static host that gives you HTTPS (GitHub Pages, Netlify Drop, Cloudflare Pages, Vercel) and register the resulting HTTPS URL as the redirect URI in your Spotify app. The token still only lives in your browser; the host never sees it.
+
+This project's own live deployment at <https://captainch0mpy.github.io/Spotify-Playlist-Rotate/> is hosted via GitHub Pages straight from the `index.html` in this repo — no build step, just push to `main` and Pages serves the latest. The same `index.html` works without modification on any other static host.
 
 ### Using it
 
@@ -181,10 +188,11 @@ Both flavors accept calendar-aware durations:
 ## Files
 
 ```
-playlist-rotator.html   # The web app, single file, no dependencies
-Containerfile           # nginx-based image for serving the HTML
+index.html              # The web app, single file, no dependencies
+Containerfile           # nginx-based image for serving locally
 spotify_rotate.py       # The CLI version, for scheduled runs
 README.md               # This file
+.gitignore              # Prevents the spotipy token cache from being committed
 ```
 
 ---
