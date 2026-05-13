@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Playlist Rotator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0e0c;
+    --bg-grain: #131311;
+    --surface: #18181550;
+    --surface-solid: #1a1a17;
+    --border: #2a2a25;
+    --border-strong: #3a3a33;
+    --text: #ebe7dd;
+    --text-muted: #8a857a;
+    --text-dim: #5a5650;
+    --accent: #9bba76;
+    --accent-dim: #6b8a4e;
+    --amber: #d4a85a;
+    --amber-dim: #8a6a30;
+    --danger: #c97b6b;
+    --radius: 4px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(155, 186, 118, 0.06), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 100%, rgba(212, 168, 90, 0.04), transparent);
+    background-attachment: fixed;
+  }
+
+  .grain {
+    position: fixed; inset: 0; pointer-events: none; z-index: 1;
+    opacity: 0.4; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  }
+
+  .container {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 4rem 2rem 6rem;
+    position: relative;
+    z-index: 2;
+  }
+
+  header {
+    margin-bottom: 3.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+
+  h1 {
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400;
+    font-size: clamp(2.5rem, 5vw, 3.75rem);
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  h1 em { color: var(--accent); }
+
+  .tagline {
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    max-width: 28rem;
+    margin-top: 0.75rem;
+  }
+
+  .user-chip {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.5rem 0.875rem;
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    font-size: 0.85rem;
+  }
+  .user-chip img { width: 24px; height: 24px; border-radius: 50%; }
+  .user-chip button {
+    background: none; border: none; color: var(--text-muted);
+    cursor: pointer; padding: 0; margin-left: 0.5rem;
+    font: inherit; text-decoration: underline;
+  }
+  .user-chip button:hover { color: var(--danger); }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    backdrop-filter: blur(8px);
+  }
+
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    margin-bottom: 1.25rem;
+  }
+
+  h2 {
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400;
+    font-size: 1.75rem;
+    line-height: 1.1;
+    margin-bottom: 1.25rem;
+    letter-spacing: -0.01em;
+  }
+  h2 em { color: var(--accent); }
+  h2.amber em { color: var(--amber); }
+
+  p { color: var(--text-muted); margin-bottom: 1rem; }
+  p:last-child { margin-bottom: 0; }
+
+  code, .mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85em;
+    background: rgba(255,255,255,0.04);
+    padding: 0.1em 0.4em;
+    border-radius: 3px;
+    color: var(--text);
+  }
+
+  .field {
+    display: flex; flex-direction: column; gap: 0.4rem;
+    margin-bottom: 1.25rem;
+  }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .field-hint { font-size: 0.8rem; color: var(--text-dim); margin-top: 0.2rem; }
+
+  input, select {
+    background: var(--bg-grain);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.7rem 0.875rem;
+    border-radius: var(--radius);
+    font: inherit;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.88rem;
+    width: 100%;
+    transition: border-color 0.15s;
+  }
+  input:focus, select:focus {
+    outline: none;
+    border-color: var(--accent-dim);
+  }
+
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 600px) { .row { grid-template-columns: 1fr; } }
+
+  .duration { display: flex; gap: 0.5rem; }
+  .duration input { flex: 1; min-width: 0; }
+  .duration select { flex: 0 0 7rem; }
+
+  button.btn {
+    background: var(--text);
+    color: var(--bg);
+    border: none;
+    padding: 0.85rem 1.5rem;
+    border-radius: var(--radius);
+    font: inherit;
+    font-weight: 500;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: transform 0.1s, background 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  button.btn:hover { transform: translateY(-1px); }
+  button.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  button.btn.secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+  }
+  button.btn.secondary:hover { background: rgba(255,255,255,0.04); }
+  button.btn.primary { background: var(--accent); color: var(--bg); }
+  button.btn.primary:hover { background: #afcb8a; }
+  button.btn.amber { background: var(--amber); color: var(--bg); }
+  button.btn.amber:hover { background: #e2bb70; }
+
+  .actions {
+    display: flex; gap: 0.75rem; flex-wrap: wrap;
+    margin-top: 1.5rem;
+  }
+
+  .status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    padding: 0.75rem 1rem;
+    background: var(--bg-grain);
+    border-left: 2px solid var(--border-strong);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    margin-top: 1rem;
+    white-space: pre-wrap;
+  }
+  .status.ok { border-left-color: var(--accent); color: var(--text); }
+  .status.err { border-left-color: var(--danger); color: #e8a89c; }
+
+  .preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  @media (max-width: 720px) { .preview-grid { grid-template-columns: 1fr; } }
+
+  .preview-col h3 {
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400; font-style: italic;
+    font-size: 1.4rem;
+    margin-bottom: 0.25rem;
+  }
+  .preview-col .count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 1rem;
+  }
+  .preview-col.out h3 em { color: var(--accent); font-style: normal; }
+  .preview-col.in h3 em { color: var(--amber); font-style: normal; }
+
+  .track-list {
+    list-style: none;
+    max-height: 320px;
+    overflow-y: auto;
+    border-top: 1px solid var(--border);
+  }
+  .track-list li {
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.85rem;
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 0.75rem;
+    align-items: baseline;
+  }
+  .track-list .date {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+  }
+  .track-list .title { color: var(--text); }
+  .track-list .artist { color: var(--text-muted); font-size: 0.8rem; }
+  .track-list:empty::after {
+    content: 'Nothing eligible.';
+    display: block;
+    padding: 1rem 0;
+    color: var(--text-dim);
+    font-style: italic;
+    font-family: 'Instrument Serif', serif;
+    font-size: 1.05rem;
+  }
+
+  .ol { padding-left: 1.25rem; color: var(--text-muted); }
+  .ol li { margin-bottom: 0.5rem; }
+  .ol code { color: var(--accent); background: rgba(155,186,118,0.08); }
+
+  .hidden { display: none !important; }
+
+  .login-card { text-align: center; padding: 4rem 2rem; }
+  .login-card .lockup {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+  }
+
+  a { color: var(--accent); }
+  a:hover { color: #afcb8a; }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+
+<div class="container">
+  <header>
+    <div>
+      <h1>Playlist <em>Rotator</em></h1>
+      <p class="tagline">Cycle stale tracks out of a primary playlist into holding, and bring rested tracks back when their time has come.</p>
+    </div>
+    <div id="user-chip" class="user-chip hidden">
+      <img id="user-avatar" src="" alt="">
+      <span id="user-name"></span>
+      <button id="logout-btn">log out</button>
+    </div>
+  </header>
+
+  <div id="status" class="status hidden" style="margin-bottom: 1.5rem;"></div>
+
+  <!-- SETUP: enter Client ID -->
+  <section id="setup-panel" class="panel hidden">
+    <div class="panel-label">One-time setup</div>
+    <h2>Connect your <em>Spotify app</em></h2>
+    <p>This tool talks to Spotify directly from your browser. You'll need to create a free developer app so Spotify trusts the connection. Takes about two minutes.</p>
+    <ol class="ol">
+      <li>Go to <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a> and click <em>Create app</em>.</li>
+      <li>Name it anything (e.g. "Playlist Rotator"). For <em>Redirect URI</em>, paste exactly: <code id="redirect-uri-display"></code></li>
+      <li>For APIs used, select <em>Web API</em>. Save.</li>
+      <li>Open the app's settings and copy the <em>Client ID</em>. Paste it below.</li>
+    </ol>
+    <div class="field" style="margin-top: 1.5rem;">
+      <label for="client-id-input">Spotify Client ID</label>
+      <input id="client-id-input" placeholder="e.g. 1a2b3c4d5e6f7g8h9i0j..." autocomplete="off">
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="save-client-id">Save and continue</button>
+    </div>
+  </section>
+
+  <!-- LOGIN -->
+  <section id="login-panel" class="panel hidden">
+    <div class="login-card">
+      <div class="lockup">Ready when you are.</div>
+      <button class="btn primary" id="login-btn">Log in with Spotify</button>
+      <div style="margin-top: 2rem;">
+        <button class="btn secondary" id="reset-config-btn">Use a different Client ID</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MAIN APP -->
+  <section id="app-panel" class="hidden">
+
+    <div class="panel">
+      <div class="panel-label">Configuration</div>
+      <h2>What rotates, <em>and how often</em></h2>
+      <div class="row">
+        <div class="field">
+          <label for="primary-select">Primary playlist</label>
+          <select id="primary-select"></select>
+          <div class="field-hint">Where new music lives.</div>
+        </div>
+        <div class="field">
+          <label for="holding-select">Holding playlist</label>
+          <select id="holding-select"></select>
+          <div class="field-hint">Where stale tracks rest.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Rotate out after</label>
+          <div class="duration">
+            <input type="number" id="rotate-value" min="1" value="6">
+            <select id="rotate-unit">
+              <option value="days">days</option>
+              <option value="months" selected>months</option>
+              <option value="years">years</option>
+            </select>
+          </div>
+          <div class="field-hint">In primary this long &rarr; holding.</div>
+        </div>
+        <div class="field">
+          <label>Revive after</label>
+          <div class="duration">
+            <input type="number" id="revive-value" min="1" value="1">
+            <select id="revive-unit">
+              <option value="days">days</option>
+              <option value="months">months</option>
+              <option value="years" selected>years</option>
+            </select>
+          </div>
+          <div class="field-hint">In holding this long &rarr; primary.</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="preview-btn">Preview changes</button>
+        <button class="btn amber" id="apply-btn" disabled>Apply</button>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="preview-panel">
+      <div class="panel-label">Preview</div>
+      <div class="preview-grid">
+        <div class="preview-col out">
+          <h3>Rotating <em>out</em></h3>
+          <div class="count" id="rotate-count">— tracks</div>
+          <ul class="track-list" id="rotate-list"></ul>
+        </div>
+        <div class="preview-col in">
+          <h3>Reviving <em>back</em></h3>
+          <div class="count" id="revive-count">— tracks</div>
+          <ul class="track-list" id="revive-list"></ul>
+        </div>
+      </div>
+    </div>
+
+  </section>
+</div>
+
+<script>
+/* ========================================================================
+   Playlist Rotator — single-file web app
+   PKCE flow, no client secret, no backend.
+   ======================================================================== */
+
+const REDIRECT_URI = window.location.origin + window.location.pathname;
+const SCOPES = 'playlist-modify-public playlist-modify-private playlist-read-private';
+const AUTH_URL = 'https://accounts.spotify.com/authorize';
+const TOKEN_URL = 'https://accounts.spotify.com/api/token';
+const API = 'https://api.spotify.com/v1';
+
+const els = {
+  setup:        document.getElementById('setup-panel'),
+  login:        document.getElementById('login-panel'),
+  app:          document.getElementById('app-panel'),
+  redirectUri:  document.getElementById('redirect-uri-display'),
+  clientIdInput: document.getElementById('client-id-input'),
+  saveClientId: document.getElementById('save-client-id'),
+  resetConfig:  document.getElementById('reset-config-btn'),
+  loginBtn:     document.getElementById('login-btn'),
+  userChip:     document.getElementById('user-chip'),
+  userAvatar:   document.getElementById('user-avatar'),
+  userName:     document.getElementById('user-name'),
+  logoutBtn:    document.getElementById('logout-btn'),
+  primary:      document.getElementById('primary-select'),
+  holding:      document.getElementById('holding-select'),
+  rotateValue:  document.getElementById('rotate-value'),
+  rotateUnit:   document.getElementById('rotate-unit'),
+  reviveValue:  document.getElementById('revive-value'),
+  reviveUnit:   document.getElementById('revive-unit'),
+  previewBtn:   document.getElementById('preview-btn'),
+  applyBtn:     document.getElementById('apply-btn'),
+  status:       document.getElementById('status'),
+  previewPanel: document.getElementById('preview-panel'),
+  rotateList:   document.getElementById('rotate-list'),
+  reviveList:   document.getElementById('revive-list'),
+  rotateCount:  document.getElementById('rotate-count'),
+  reviveCount:  document.getElementById('revive-count'),
+};
+
+let previewData = null; // { rotate: [...], revive: [...] }
+
+/* ---------- storage helpers ---------- */
+const store = {
+  get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
+  del: k => localStorage.removeItem(k),
+};
+
+/* ---------- PKCE helpers ---------- */
+function randString(len) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  const arr = new Uint8Array(len);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, b => chars[b % chars.length]).join('');
+}
+async function pkceChallenge(verifier) {
+  const data = new TextEncoder().encode(verifier);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/* ---------- auth flow ---------- */
+async function startLogin() {
+  const clientId = store.get('client_id');
+  if (!clientId) { showSetup(); return; }
+  const verifier = randString(64);
+  const challenge = await pkceChallenge(verifier);
+  sessionStorage.setItem('pkce_verifier_session', verifier);
+  localStorage.setItem('pkce_verifier', verifier);
+  const params = new URLSearchParams({
+    client_id: clientId,
+    response_type: 'code',
+    redirect_uri: REDIRECT_URI,
+    code_challenge_method: 'S256',
+    code_challenge: challenge,
+    scope: SCOPES,
+  });
+  window.location.href = `${AUTH_URL}?${params}`;
+}
+
+async function exchangeCode(code) {
+  const clientId = store.get('client_id');
+  const verifier = sessionStorage.getItem('pkce_verifier_session')
+                || localStorage.getItem('pkce_verifier');
+  if (!verifier) throw new Error('Missing PKCE verifier. Your browser may have cleared storage between the redirect; try again with a non-private window or different browser.');
+  const body = new URLSearchParams({
+    client_id: clientId,
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: REDIRECT_URI,
+    code_verifier: verifier,
+  });
+  const r = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+  if (!r.ok) {
+    const errText = await r.text();
+    console.error('[rotator] token exchange failed', r.status, errText);
+    throw new Error(`Token exchange failed (${r.status}): ${errText}`);
+  }
+  const data = await r.json();
+  sessionStorage.setItem('access_token', data.access_token);
+  sessionStorage.setItem('token_expires', Date.now() + (data.expires_in * 1000));
+  if (data.refresh_token) sessionStorage.setItem('refresh_token', data.refresh_token);
+  sessionStorage.removeItem('pkce_verifier_session');
+  localStorage.removeItem('pkce_verifier');
+}
+
+function isTokenValid() {
+  const t = sessionStorage.getItem('access_token');
+  const exp = parseInt(sessionStorage.getItem('token_expires') || '0', 10);
+  return t && Date.now() < exp - 30_000;
+}
+
+function logout() {
+  sessionStorage.clear();
+  showLogin();
+}
+
+/* ---------- Spotify API wrappers ---------- */
+async function spotify(path, opts = {}) {
+  const token = sessionStorage.getItem('access_token');
+  const r = await fetch(path.startsWith('http') ? path : API + path, {
+    ...opts,
+    headers: {
+      ...(opts.headers || {}),
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  if (r.status === 401) { logout(); throw new Error('Session expired. Logging in again.'); }
+  if (r.status === 403) {
+    const body = await r.text();
+    console.error('[rotator] 403 from Spotify on', path, body);
+    throw new Error(
+      '403 Forbidden from Spotify. This usually means your Spotify account ' +
+      'is not on your app\'s User Management allowlist. Go to your app in ' +
+      'developer.spotify.com/dashboard → Settings → User Management → Add new ' +
+      'user, add your own Spotify email, then log out here and log back in.'
+    );
+  }
+  if (r.status === 429) {
+    const retry = parseInt(r.headers.get('Retry-After') || '2', 10);
+    await new Promise(s => setTimeout(s, (retry + 1) * 1000));
+    return spotify(path, opts);
+  }
+  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  if (r.status === 204) return null;
+  return r.json();
+}
+
+async function fetchMe() {
+  return spotify('/me');
+}
+
+async function fetchAllPlaylists() {
+  let all = [];
+  let url = '/me/playlists?limit=50';
+  while (url) {
+    const data = await spotify(url);
+    all = all.concat(data.items);
+    url = data.next;
+  }
+  return all;
+}
+
+async function fetchAllItems(playlistId) {
+  let all = [];
+  // Feb 2026: inside each playlist item, the track-like object is named `item`
+  // (was `track`). Requesting both so this works on dev-mode and extended apps.
+  const fields = 'items(added_at,item(uri,name,artists(name),is_local),track(uri,name,artists(name),is_local)),next';
+  let url = `/playlists/${playlistId}/items?limit=100&fields=${encodeURIComponent(fields)}`;
+  while (url) {
+    const data = await spotify(url);
+    all = all.concat(data.items);
+    url = data.next;
+  }
+  return all;
+}
+
+function selectOld(items, cutoff) {
+  return items
+    .map(it => {
+      // Feb 2026: it.track is now it.item; check both for safety.
+      const t = it.item || it.track;
+      if (!t || t.is_local || !t.uri) return null;
+      const added = new Date(it.added_at);
+      if (added >= cutoff) return null;
+      return {
+        uri: t.uri,
+        name: t.name,
+        artist: t.artists.map(a => a.name).join(', '),
+        added,
+      };
+    })
+    .filter(Boolean);
+}
+
+async function addTracks(playlistId, uris) {
+  for (let i = 0; i < uris.length; i += 100) {
+    await spotify(`/playlists/${playlistId}/items`, {
+      method: 'POST',
+      body: JSON.stringify({ uris: uris.slice(i, i + 100) }),
+    });
+  }
+}
+
+async function removeTracks(playlistId, uris) {
+  for (let i = 0; i < uris.length; i += 100) {
+    // Feb 2026: DELETE body parameter renamed from `tracks` to `items`.
+    await spotify(`/playlists/${playlistId}/items`, {
+      method: 'DELETE',
+      body: JSON.stringify({ items: uris.slice(i, i + 100).map(uri => ({ uri })) }),
+    });
+  }
+}
+
+/* ---------- UI flow ---------- */
+function setStatus(msg, kind = '') {
+  els.status.textContent = msg;
+  els.status.className = 'status ' + kind;
+  els.status.classList.remove('hidden');
+}
+function clearStatus() { els.status.classList.add('hidden'); }
+
+function showSetup() {
+  els.setup.classList.remove('hidden');
+  els.login.classList.add('hidden');
+  els.app.classList.add('hidden');
+  els.userChip.classList.add('hidden');
+  els.redirectUri.textContent = REDIRECT_URI;
+  const existing = store.get('client_id');
+  if (existing) els.clientIdInput.value = existing;
+}
+function showLogin() {
+  els.setup.classList.add('hidden');
+  els.login.classList.remove('hidden');
+  els.app.classList.add('hidden');
+  els.userChip.classList.add('hidden');
+}
+function showApp() {
+  els.setup.classList.add('hidden');
+  els.login.classList.add('hidden');
+  els.app.classList.remove('hidden');
+  els.userChip.classList.remove('hidden');
+}
+
+async function initApp() {
+  try {
+    const me = await fetchMe();
+    els.userName.textContent = me.display_name || me.id;
+    if (me.images && me.images[0]) els.userAvatar.src = me.images[0].url;
+    else els.userAvatar.style.display = 'none';
+
+    const playlists = await fetchAllPlaylists();
+    const ownedOrCollab = playlists.filter(p =>
+      p && p.id && p.name && p.owner &&
+      (p.owner.id === me.id || p.collaborative)
+    );
+    populatePlaylistSelects(ownedOrCollab);
+    restorePrefs();
+    showApp();
+  } catch (e) {
+    setStatus('Failed to load Spotify data: ' + e.message, 'err');
+    showLogin();
+  }
+}
+
+function populatePlaylistSelects(playlists) {
+  const opts = playlists
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(p => {
+      // Feb 2026 rename: playlist.tracks → playlist.items. Fall back for
+      // extended-quota apps that still see the old field.
+      const counter = p.items || p.tracks;
+      const count = counter && typeof counter.total === 'number' ? counter.total : '?';
+      return `<option value="${p.id}">${escapeHtml(p.name)} (${count})</option>`;
+    })
+    .join('');
+  els.primary.innerHTML = '<option value="">— select —</option>' + opts;
+  els.holding.innerHTML = '<option value="">— select —</option>' + opts;
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+function savePrefs() {
+  store.set('prefs', {
+    primary:     els.primary.value,
+    holding:     els.holding.value,
+    rotateValue: parseInt(els.rotateValue.value, 10),
+    rotateUnit:  els.rotateUnit.value,
+    reviveValue: parseInt(els.reviveValue.value, 10),
+    reviveUnit:  els.reviveUnit.value,
+  });
+}
+function restorePrefs() {
+  const p = store.get('prefs');
+  if (!p) return;
+  if (p.primary)     els.primary.value     = p.primary;
+  if (p.holding)     els.holding.value     = p.holding;
+  if (p.rotateValue) els.rotateValue.value = p.rotateValue;
+  if (p.rotateUnit)  els.rotateUnit.value  = p.rotateUnit;
+  if (p.reviveValue) els.reviveValue.value = p.reviveValue;
+  if (p.reviveUnit)  els.reviveUnit.value  = p.reviveUnit;
+}
+
+function renderPreview(label, items, listEl, countEl) {
+  countEl.textContent = `${items.length} track${items.length === 1 ? '' : 's'}`;
+  listEl.innerHTML = items.slice(0, 50).map(t => `
+    <li>
+      <span class="date">${t.added.toISOString().slice(0,10)}</span>
+      <span><span class="title">${escapeHtml(t.name)}</span> &middot;
+            <span class="artist">${escapeHtml(t.artist)}</span></span>
+    </li>
+  `).join('');
+  if (items.length > 50) {
+    listEl.innerHTML += `<li style="grid-template-columns:1fr;color:var(--text-dim);font-style:italic;">… and ${items.length - 50} more</li>`;
+  }
+}
+
+function cutoffDate(value, unit) {
+  const d = new Date();
+  if (unit === 'days')   d.setDate(d.getDate() - value);
+  if (unit === 'months') d.setMonth(d.getMonth() - value);
+  if (unit === 'years')  d.setFullYear(d.getFullYear() - value);
+  return d;
+}
+
+async function runPreview() {
+  clearStatus();
+  if (!els.primary.value || !els.holding.value) {
+    setStatus('Pick both playlists first.', 'err'); return;
+  }
+  if (els.primary.value === els.holding.value) {
+    setStatus('Primary and holding must be different playlists.', 'err'); return;
+  }
+  savePrefs();
+  const rotateValue = parseInt(els.rotateValue.value, 10);
+  const reviveValue = parseInt(els.reviveValue.value, 10);
+  const rotateCutoff = cutoffDate(rotateValue, els.rotateUnit.value);
+  const reviveCutoff = cutoffDate(reviveValue, els.reviveUnit.value);
+  els.previewBtn.disabled = true;
+  els.applyBtn.disabled = true;
+  setStatus('Fetching playlists…');
+
+  try {
+    const [primaryItems, holdingItems] = await Promise.all([
+      fetchAllItems(els.primary.value),
+      fetchAllItems(els.holding.value),
+    ]);
+
+    const rotate = selectOld(primaryItems, rotateCutoff);
+    const revive = selectOld(holdingItems, reviveCutoff);
+
+    previewData = { rotate, revive };
+    els.previewPanel.classList.remove('hidden');
+    renderPreview('rotate', rotate, els.rotateList, els.rotateCount);
+    renderPreview('revive', revive, els.reviveList, els.reviveCount);
+
+    if (rotate.length + revive.length === 0) {
+      setStatus('Nothing to move right now.', 'ok');
+    } else {
+      setStatus(`Preview ready. ${rotate.length} out, ${revive.length} back. Review and Apply to commit.`, 'ok');
+      els.applyBtn.disabled = false;
+    }
+  } catch (e) {
+    setStatus('Error: ' + e.message, 'err');
+  } finally {
+    els.previewBtn.disabled = false;
+  }
+}
+
+async function runApply() {
+  if (!previewData) return;
+  const { rotate, revive } = previewData;
+  if (!confirm(`Apply now?\n\n• ${rotate.length} tracks: primary → holding\n• ${revive.length} tracks: holding → primary\n\nThis modifies your playlists.`)) return;
+
+  els.applyBtn.disabled = true;
+  els.previewBtn.disabled = true;
+  setStatus('Applying changes…');
+
+  try {
+    // Rotate out
+    if (rotate.length) {
+      const existingInHolding = new Set(
+        (await fetchAllItems(els.holding.value))
+          .map(i => (i.item || i.track))
+          .filter(t => t && t.uri)
+          .map(t => t.uri)
+      );
+      const newToHolding = rotate.map(t => t.uri).filter(u => !existingInHolding.has(u));
+      await addTracks(els.holding.value, newToHolding);
+      await removeTracks(els.primary.value, rotate.map(t => t.uri));
+    }
+    // Revive
+    if (revive.length) {
+      const existingInPrimary = new Set(
+        (await fetchAllItems(els.primary.value))
+          .map(i => (i.item || i.track))
+          .filter(t => t && t.uri)
+          .map(t => t.uri)
+      );
+      const newToPrimary = revive.map(t => t.uri).filter(u => !existingInPrimary.has(u));
+      await addTracks(els.primary.value, newToPrimary);
+      await removeTracks(els.holding.value, revive.map(t => t.uri));
+    }
+    setStatus(`Done. Rotated ${rotate.length} out, revived ${revive.length} back.`, 'ok');
+    previewData = null;
+    els.previewPanel.classList.add('hidden');
+  } catch (e) {
+    setStatus('Error during apply: ' + e.message, 'err');
+    els.previewBtn.disabled = false;
+  }
+}
+
+/* ---------- wire up ---------- */
+els.saveClientId.addEventListener('click', () => {
+  const id = els.clientIdInput.value.trim();
+  if (!id) return;
+  store.set('client_id', id);
+  showLogin();
+});
+els.resetConfig.addEventListener('click', () => {
+  store.del('client_id');
+  showSetup();
+});
+els.loginBtn.addEventListener('click', startLogin);
+els.logoutBtn.addEventListener('click', logout);
+els.previewBtn.addEventListener('click', runPreview);
+els.applyBtn.addEventListener('click', runApply);
+
+/* ---------- boot ---------- */
+(async function boot() {
+  // Handle OAuth redirect
+  const url = new URL(window.location.href);
+  const code = url.searchParams.get('code');
+  const err = url.searchParams.get('error');
+  if (err) {
+    showLogin();
+    setStatus('Login error: ' + err, 'err');
+    history.replaceState({}, '', REDIRECT_URI);
+    return;
+  }
+  if (code) {
+    try {
+      await exchangeCode(code);
+      history.replaceState({}, '', REDIRECT_URI);
+      await initApp();
+      return;
+    } catch (e) {
+      showLogin();
+      setStatus('Token exchange failed: ' + e.message, 'err');
+      history.replaceState({}, '', REDIRECT_URI);
+      return;
+    }
+  }
+
+  if (!store.get('client_id')) { showSetup(); return; }
+  if (isTokenValid()) { await initApp(); return; }
+  showLogin();
+})();
+</script>
+</body>
+</html>
