@@ -1,0 +1,29 @@
+# Spotify auth token cache — contains live access + refresh tokens.
+# Never commit this.
+.spotify_token_cache
+.cache
+.cache-*
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs from cron runs etc.
+*.log
