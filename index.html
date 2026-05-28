@@ -174,9 +174,46 @@
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
   @media (max-width: 600px) { .row { grid-template-columns: 1fr; } }
 
-  .duration { display: flex; gap: 0.5rem; }
-  .duration input { flex: 1; min-width: 0; }
-  .duration select { flex: 0 0 7rem; }
+  .duration-multi {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.4rem;
+  }
+  .dunit {
+    display: flex;
+    align-items: stretch;
+    background: var(--bg-grain);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color 0.15s;
+  }
+  .dunit:focus-within { border-color: var(--accent-dim); }
+  .dunit input {
+    border: none;
+    background: transparent;
+    padding: 0.7rem 0.3rem 0.7rem 0.6rem;
+    width: 100%;
+    min-width: 0;
+    text-align: right;
+    -moz-appearance: textfield;
+  }
+  .dunit input::-webkit-outer-spin-button,
+  .dunit input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .dunit input:focus { outline: none; }
+  .dunit span {
+    display: flex;
+    align-items: center;
+    padding: 0 0.6rem 0 0.2rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    pointer-events: none;
+  }
 
   button.btn {
     background: var(--text);
@@ -366,25 +403,45 @@
       <div class="row">
         <div class="field">
           <label>Rotate out after</label>
-          <div class="duration">
-            <input type="number" id="rotate-value" min="1" value="6">
-            <select id="rotate-unit">
-              <option value="days">days</option>
-              <option value="months" selected>months</option>
-              <option value="years">years</option>
-            </select>
+          <div class="duration-multi" id="rotate-duration">
+            <div class="dunit">
+              <input type="number" id="rotate-years" min="0" value="0">
+              <span>yr</span>
+            </div>
+            <div class="dunit">
+              <input type="number" id="rotate-months" min="0" value="6">
+              <span>mo</span>
+            </div>
+            <div class="dunit">
+              <input type="number" id="rotate-days" min="0" value="0">
+              <span>d</span>
+            </div>
+            <div class="dunit">
+              <input type="number" id="rotate-hours" min="0" value="0">
+              <span>hr</span>
+            </div>
           </div>
           <div class="field-hint">In primary this long &rarr; holding.</div>
         </div>
         <div class="field">
           <label>Revive after</label>
-          <div class="duration">
-            <input type="number" id="revive-value" min="1" value="1">
-            <select id="revive-unit">
-              <option value="days">days</option>
-              <option value="months">months</option>
-              <option value="years" selected>years</option>
-            </select>
+          <div class="duration-multi" id="revive-duration">
+            <div class="dunit">
+              <input type="number" id="revive-years" min="0" value="1">
+              <span>yr</span>
+            </div>
+            <div class="dunit">
+              <input type="number" id="revive-months" min="0" value="0">
+              <span>mo</span>
+            </div>
+            <div class="dunit">
+              <input type="number" id="revive-days" min="0" value="0">
+              <span>d</span>
+            </div>
+            <div class="dunit">
+              <input type="number" id="revive-hours" min="0" value="0">
+              <span>hr</span>
+            </div>
           </div>
           <div class="field-hint">In holding this long &rarr; primary.</div>
         </div>
@@ -441,10 +498,14 @@ const els = {
   logoutBtn:    document.getElementById('logout-btn'),
   primary:      document.getElementById('primary-select'),
   holding:      document.getElementById('holding-select'),
-  rotateValue:  document.getElementById('rotate-value'),
-  rotateUnit:   document.getElementById('rotate-unit'),
-  reviveValue:  document.getElementById('revive-value'),
-  reviveUnit:   document.getElementById('revive-unit'),
+  rotateYears:  document.getElementById('rotate-years'),
+  rotateMonths: document.getElementById('rotate-months'),
+  rotateDays:   document.getElementById('rotate-days'),
+  rotateHours:  document.getElementById('rotate-hours'),
+  reviveYears:  document.getElementById('revive-years'),
+  reviveMonths: document.getElementById('revive-months'),
+  reviveDays:   document.getElementById('revive-days'),
+  reviveHours:  document.getElementById('revive-hours'),
   previewBtn:   document.getElementById('preview-btn'),
   applyBtn:     document.getElementById('apply-btn'),
   status:       document.getElementById('status'),
@@ -706,25 +767,38 @@ function escapeHtml(s) {
   return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
+function readDuration(prefix) {
+  return {
+    years:  Math.max(0, parseInt(els[prefix + 'Years'].value, 10) || 0),
+    months: Math.max(0, parseInt(els[prefix + 'Months'].value, 10) || 0),
+    days:   Math.max(0, parseInt(els[prefix + 'Days'].value, 10) || 0),
+    hours:  Math.max(0, parseInt(els[prefix + 'Hours'].value, 10) || 0),
+  };
+}
+
+function writeDuration(prefix, d) {
+  if (!d) return;
+  els[prefix + 'Years'].value  = d.years  || 0;
+  els[prefix + 'Months'].value = d.months || 0;
+  els[prefix + 'Days'].value   = d.days   || 0;
+  els[prefix + 'Hours'].value  = d.hours  || 0;
+}
+
 function savePrefs() {
   store.set('prefs', {
-    primary:     els.primary.value,
-    holding:     els.holding.value,
-    rotateValue: parseInt(els.rotateValue.value, 10),
-    rotateUnit:  els.rotateUnit.value,
-    reviveValue: parseInt(els.reviveValue.value, 10),
-    reviveUnit:  els.reviveUnit.value,
+    primary: els.primary.value,
+    holding: els.holding.value,
+    rotate:  readDuration('rotate'),
+    revive:  readDuration('revive'),
   });
 }
 function restorePrefs() {
   const p = store.get('prefs');
   if (!p) return;
-  if (p.primary)     els.primary.value     = p.primary;
-  if (p.holding)     els.holding.value     = p.holding;
-  if (p.rotateValue) els.rotateValue.value = p.rotateValue;
-  if (p.rotateUnit)  els.rotateUnit.value  = p.rotateUnit;
-  if (p.reviveValue) els.reviveValue.value = p.reviveValue;
-  if (p.reviveUnit)  els.reviveUnit.value  = p.reviveUnit;
+  if (p.primary) els.primary.value = p.primary;
+  if (p.holding) els.holding.value = p.holding;
+  writeDuration('rotate', p.rotate);
+  writeDuration('revive', p.revive);
 }
 
 function renderPreview(label, items, listEl, countEl) {
@@ -741,12 +815,28 @@ function renderPreview(label, items, listEl, countEl) {
   }
 }
 
-function cutoffDate(value, unit) {
+function cutoffDate(duration) {
+  // Apply years/months via calendar math, then subtract days/hours as fixed
+  // intervals. Order matters slightly for month-end edges; JS Date normalizes.
   const d = new Date();
-  if (unit === 'days')   d.setDate(d.getDate() - value);
-  if (unit === 'months') d.setMonth(d.getMonth() - value);
-  if (unit === 'years')  d.setFullYear(d.getFullYear() - value);
+  if (duration.years)  d.setFullYear(d.getFullYear() - duration.years);
+  if (duration.months) d.setMonth(d.getMonth() - duration.months);
+  if (duration.days)   d.setDate(d.getDate() - duration.days);
+  if (duration.hours)  d.setHours(d.getHours() - duration.hours);
   return d;
+}
+
+function isZeroDuration(d) {
+  return !d.years && !d.months && !d.days && !d.hours;
+}
+
+function formatDuration(d) {
+  const parts = [];
+  if (d.years)  parts.push(`${d.years}y`);
+  if (d.months) parts.push(`${d.months}mo`);
+  if (d.days)   parts.push(`${d.days}d`);
+  if (d.hours)  parts.push(`${d.hours}h`);
+  return parts.join(' ') || '0';
 }
 
 async function runPreview() {
@@ -757,14 +847,17 @@ async function runPreview() {
   if (els.primary.value === els.holding.value) {
     setStatus('Primary and holding must be different playlists.', 'err'); return;
   }
+  const rotateDur = readDuration('rotate');
+  const reviveDur = readDuration('revive');
+  if (isZeroDuration(rotateDur) || isZeroDuration(reviveDur)) {
+    setStatus('Both thresholds need at least one non-zero unit.', 'err'); return;
+  }
   savePrefs();
-  const rotateValue = parseInt(els.rotateValue.value, 10);
-  const reviveValue = parseInt(els.reviveValue.value, 10);
-  const rotateCutoff = cutoffDate(rotateValue, els.rotateUnit.value);
-  const reviveCutoff = cutoffDate(reviveValue, els.reviveUnit.value);
+  const rotateCutoff = cutoffDate(rotateDur);
+  const reviveCutoff = cutoffDate(reviveDur);
   els.previewBtn.disabled = true;
   els.applyBtn.disabled = true;
-  setStatus('Fetching playlists…');
+  setStatus(`Fetching playlists… (rotate after ${formatDuration(rotateDur)}, revive after ${formatDuration(reviveDur)})`);
 
   try {
     const [primaryItems, holdingItems] = await Promise.all([

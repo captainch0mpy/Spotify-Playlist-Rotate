@@ -9,10 +9,20 @@ Two-way rotation between a primary playlist and a holding playlist:
 A track's "age" is when it was added to its current playlist, so the cycle
 restarts naturally each time a song moves.
 
-Thresholds use a compact duration string: Nd / Nm / Ny.
-    180d  = 180 days
-    6m    = 6 months
-    1y    = 1 year
+Thresholds use a compact duration string built from any combination of:
+    Ny    years          (calendar-aware)
+    Nmo   months         (calendar-aware; also accepts plain Nm)
+    Nd    days
+    Nh    hours
+
+Combine units in any order, with or without spaces:
+    1y                   = 1 year
+    6mo                  = 6 months
+    18mo                 = 18 months
+    180d                 = 180 days
+    1y 2mo 15d           = 1 year, 2 months, 15 days
+    1y2mo15d6h           = same, with no spaces
+    36h                  = 36 hours
 Months and years use calendar-aware math (Feb-29 + 1y = Feb-28, etc.).
 
 SETUP (one-time)
@@ -42,7 +52,8 @@ USAGE
     python spotify_rotate.py --only rotate         # only stale-out
     python spotify_rotate.py --only revive         # only bring-back
     python spotify_rotate.py --rotate 90d          # override rotate threshold
-    python spotify_rotate.py --revive 2y           # override revive threshold
+    python spotify_rotate.py --revive "1y 6mo"     # composite duration
+    python spotify_rotate.py --rotate 36h          # rotate after 36 hours
 
 The first run opens a browser to authorize. After that a cached token
 lets it run unattended (good for cron / Task Scheduler).
@@ -51,7 +62,7 @@ lets it run unattended (good for cron / Task Scheduler).
 import argparse
 import re
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 import requests
 import spotipy
@@ -76,19 +87,63 @@ SCOPES = "playlist-modify-public playlist-modify-private playlist-read-private"
 
 # ---------- duration parsing ----------
 
+# Single-unit regex used by the composite parser below.
+# Alternation order matters: 'mo' must be tried before 'm' so that '6mo' parses
+# as 6 months rather than '6m' followed by stray 'o'.
+_PART_RE = re.compile(r"(\d+)\s*(y|mo|m|d|h)", re.IGNORECASE)
+
+
 def parse_duration(s):
-    """Parse 'Nd', 'Nm', 'Ny' into (delta, human_label)."""
-    m = re.match(r"^\s*(\d+)\s*([dmy])\s*$", str(s).lower())
-    if not m:
+    """Parse a composite duration string into (relativedelta, human_label).
+
+    Accepts any combination of Ny / Nmo / Nm / Nd / Nh in any order, with
+    optional whitespace. Returns a relativedelta (which handles years,
+    months, days, and hours uniformly) plus a short label like '1y 2mo 15d'.
+    """
+    raw = str(s).strip().lower()
+    if not raw:
+        raise ValueError("Empty duration.")
+
+    matches = list(_PART_RE.finditer(raw))
+    if not matches:
         raise ValueError(
-            f"Bad duration: {s!r}. Use Nd, Nm, or Ny (e.g. 180d, 6m, 1y)."
+            f"Bad duration: {s!r}. "
+            "Use Ny, Nmo, Nd, Nh (e.g. '1y 6mo', '90d', '36h')."
         )
-    n, unit = int(m.group(1)), m.group(2)
-    if unit == "d":
-        return timedelta(days=n), f"{n} day{'s' if n != 1 else ''}"
-    if unit == "m":
-        return relativedelta(months=n), f"{n} month{'s' if n != 1 else ''}"
-    return relativedelta(years=n), f"{n} year{'s' if n != 1 else ''}"
+
+    # Validate full coverage: every character (ignoring whitespace) must
+    # belong to a match, otherwise the input had garbage in it.
+    covered = "".join(m.group(0) for m in matches)
+    if re.sub(r"\s+", "", covered) != re.sub(r"\s+", "", raw):
+        raise ValueError(
+            f"Bad duration: {s!r}. Unparseable characters present."
+        )
+
+    totals = {"y": 0, "mo": 0, "d": 0, "h": 0}
+    for m in matches:
+        n, unit = int(m.group(1)), m.group(2).lower()
+        if unit == "m":           # 'm' alone means months
+            unit = "mo"
+        totals[unit] += n
+
+    if all(v == 0 for v in totals.values()):
+        raise ValueError(
+            f"Bad duration: {s!r}. At least one unit must be non-zero."
+        )
+
+    delta = relativedelta(
+        years=totals["y"],
+        months=totals["mo"],
+        days=totals["d"],
+        hours=totals["h"],
+    )
+
+    label_parts = []
+    if totals["y"]:  label_parts.append(f"{totals['y']}y")
+    if totals["mo"]: label_parts.append(f"{totals['mo']}mo")
+    if totals["d"]:  label_parts.append(f"{totals['d']}d")
+    if totals["h"]:  label_parts.append(f"{totals['h']}h")
+    return delta, " ".join(label_parts)
 
 
 # ---------- auth ----------
@@ -238,7 +293,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Rotate Spotify playlist tracks both ways.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Durations: Nd days, Nm months, Ny years. e.g. 180d, 6m, 1y.",
+        epilog=("Durations combine units: Ny years, Nmo months, Nd days, "
+                "Nh hours. Examples: '1y', '6mo', '180d', '1y 2mo 15d', '36h'."),
     )
     parser.add_argument("--apply", action="store_true",
                         help="Actually perform moves. Without this it's a dry run.")
